@@ -1,15 +1,65 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
+const express = require('express');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const channel1 = process.env.CHANNEL_1;
 const channel2 = process.env.CHANNEL_2;
+const url = process.env.RENDER_URL;
+const port = process.env.PORT || 3000;
 
-const bot = new TelegramBot(token, { polling: true });
+// Determine if we're in production (Render) or local development
+const isProduction = process.env.NODE_ENV === 'production' || (url && url !== 'YOUR_RENDER_URL');
+
+let bot;
+if (isProduction) {
+  // Production: Use webhooks
+  bot = new TelegramBot(token);
+  console.log('Running in production mode with webhooks');
+} else {
+  // Development: Use polling
+  bot = new TelegramBot(token, { polling: true });
+  console.log('Running in development mode with polling');
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Create Express app (for production)
+const app = express();
+app.use(express.json());
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.send('Bot is running!');
+});
+
+// Webhook endpoint (for production)
+app.post('/webhook', (req, res) => {
+  if (isProduction) {
+    bot.processUpdate(req.body);
+  }
+  res.sendStatus(200);
+});
+
+// Start the server
+app.listen(port, async () => {
+  console.log(`Server running on port ${port}`);
+  
+  // Set webhook only in production
+  if (isProduction && url && url !== 'YOUR_RENDER_URL') {
+    try {
+      await bot.setWebHook(`${url}/webhook`);
+      console.log('Webhook set successfully');
+    } catch (error) {
+      console.error('Failed to set webhook:', error.message);
+    }
+  } else if (isProduction) {
+    console.log('Warning: RENDER_URL not set properly for production');
+  }
+});
 
 const userState = {};
 
@@ -234,7 +284,7 @@ bot.on('message', async (msg) => {
 
 bot.onText(/📞 Contact/, (msg) => {
     const chatId = msg.chat.id;
-    const adminUsername = 'anurag4321';
+    const adminUsername = 'botcryptoadmin1';
     bot.sendMessage(chatId, `For any queries, you can contact the admin here: @${adminUsername}`);
 });
 
@@ -284,7 +334,16 @@ bot.onText(/🎁 Bonus/, async (msg) => {
 });
 
 bot.on('polling_error', (error) => {
-    console.error(`Polling error: ${error.code} - ${error.message}`);
+    console.error(`Bot error: ${error.code} - ${error.message}`);
 });
 
-console.log('Bot is running...');
+// Keep the process alive
+process.on('SIGINT', () => {
+    console.log('Received SIGINT. Graceful shutdown...');
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('Received SIGTERM. Graceful shutdown...');
+    process.exit(0);
+});
