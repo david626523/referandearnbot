@@ -2,7 +2,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
-const fetch = require('node-fetch');
+const https = require('https');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -63,10 +63,13 @@ app.listen(port, async () => {
 
   // Keep-alive mechanism for free Render plan
   if (isProduction && url && url !== 'YOUR_RENDER_URL') {
-    setInterval(async () => {
+    setInterval(() => {
       try {
-        const response = await fetch(`${url}/`);
-        console.log(`Keep-alive ping: ${response.status}`);
+        https.get(url, (res) => {
+          console.log(`Keep-alive ping: ${res.statusCode}`);
+        }).on('error', (error) => {
+          console.error('Keep-alive ping failed:', error.message);
+        });
       } catch (error) {
         console.error('Keep-alive ping failed:', error.message);
       }
