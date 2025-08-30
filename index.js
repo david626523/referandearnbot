@@ -2,6 +2,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
+const fetch = require('node-fetch');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -58,6 +59,18 @@ app.listen(port, async () => {
     }
   } else if (isProduction) {
     console.log('Warning: RENDER_URL not set properly for production');
+  }
+
+  // Keep-alive mechanism for free Render plan
+  if (isProduction && url && url !== 'YOUR_RENDER_URL') {
+    setInterval(async () => {
+      try {
+        const response = await fetch(`${url}/`);
+        console.log(`Keep-alive ping: ${response.status}`);
+      } catch (error) {
+        console.error('Keep-alive ping failed:', error.message);
+      }
+    }, 14 * 60 * 1000); // Ping every 14 minutes
   }
 });
 
